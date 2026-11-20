@@ -160,6 +160,9 @@ def test_multipart(owner):
     assert [part["PartNumber"] for part in c.list_parts(**args)["Parts"]] == [1, 2]
     rejected(lambda: c.get_object(Bucket=bucket, Key="assembled"), "NoSuchKey")
     rejected(lambda: c.complete_multipart_upload(**args, MultipartUpload={"Parts": parts[::-1]}), "InvalidPartOrder")
+    third = c.upload_part(**args, PartNumber=3, Body=b"tail")
+    small_parts = [parts[1], {"PartNumber": 3, "ETag": third["ETag"]}]
+    rejected(lambda: c.complete_multipart_upload(**args, MultipartUpload={"Parts": small_parts}), "EntityTooSmall")
     result = c.complete_multipart_upload(**args, MultipartUpload={"Parts": parts})
     assert result["ETag"].endswith('-2"')
     assert c.get_object(Bucket=bucket, Key="assembled")["Body"].read() == b"".join(blocks)

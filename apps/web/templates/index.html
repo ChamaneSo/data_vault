@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Object browser · DataVault</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i></span>DataVault</div>
+    <div class="header-actions">
+      <span class="server-status" id="health" role="status"><i></i>Checking server</span>
+      <button id="disconnect" class="quiet" hidden>Disconnect</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="login" class="gateway" aria-labelledby="login-title">
+      <div class="intro">
+        <div class="intro-text"><h1>Object browser</h1>
+          <p>Browse buckets and transfer files on your DataVault server.</p></div>
+        <div class="rack" aria-hidden="true">
+          <div class="rack-floor"></div>
+          <div class="plate p-bottom"><i></i><b></b></div>
+          <div class="plate p-middle"><i></i><b></b></div>
+          <div class="plate p-top"><i></i><b></b></div>
+        </div>
+      </div>
+      <div class="connect-panel">
+        <form id="connect-form">
+          <h2>Connect account</h2>
+          <p class="muted">Use the access keys issued for your service account.</p>
+          <label for="access-key">Access key ID</label>
+          <input id="access-key" name="access_key" required maxlength="128" spellcheck="false" autocapitalize="none" autocomplete="off">
+          <label for="secret-key">Secret access key</label>
+          <div class="secret-field">
+            <input id="secret-key" name="secret_key" type="password" required maxlength="256" autocomplete="off" spellcheck="false">
+            <button id="reveal" type="button" aria-pressed="false">Show</button>
+          </div>
+          <p class="error" id="connect-error" role="alert" hidden></p>
+          <button type="submit" class="primary wide" id="connect-button">Connect to DataVault</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="workspace" class="workspace" hidden aria-label="Object browser">
+      <aside class="sidebar">
+        <div class="side-top"><h2>Buckets</h2><button id="new-bucket" class="icon-button" title="Create bucket" aria-label="Create bucket">+</button></div>
+        <nav id="bucket-list" aria-label="Available buckets"></nav>
+        <p id="bucket-message" class="muted small" role="status"></p>
+        <button id="more-buckets" class="text-button" hidden>Load more buckets</button>
+        <div class="account"><span class="account-symbol" aria-hidden="true">DV</span><div><b>Service account</b><span id="account-label"></span></div></div>
+      </aside>
+      <div class="objects-panel">
+        <div class="workspace-heading"><div><p class="section-label">Object browser</p><h1 id="bucket-title">Your buckets</h1></div>
+          <button class="primary" id="upload-open" disabled><span class="upload-symbol" aria-hidden="true"></span>Upload file</button>
+        </div>
+        <nav id="breadcrumbs" class="breadcrumbs" aria-label="Object prefix"></nav>
+        <div class="toolbar">
+          <label class="search" for="search"><span class="magnifier" aria-hidden="true"></span>
+            <input id="search" type="search" placeholder="Find by key prefix" aria-label="Find objects by key prefix" disabled></label>
+          <button id="refresh" class="secondary"><span aria-hidden="true">↻</span> Refresh</button>
+        </div>
+        <p id="workspace-error" class="error" role="alert" hidden></p>
+        <div class="table-wrap">
+          <table><thead><tr><th scope="col">Name</th><th scope="col">Size</th><th scope="col">Modified</th><th scope="col"><span class="sr-only">Download</span></th></tr></thead>
+            <tbody id="objects"></tbody></table>
+          <div id="empty" class="empty" role="status">
+            <span class="empty-folder" aria-hidden="true"></span>
+            <strong id="empty-title">Select a bucket</strong><p id="empty-detail"></p>
+          </div>
+        </div>
+        <div class="pagination"><span id="page-summary" aria-live="polite"></span><div>
+          <button class="secondary" id="previous" disabled>Previous</button>
+          <button class="secondary" id="next" disabled>Next</button>
+        </div></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="bucket-dialog" aria-labelledby="bucket-dialog-title">
+    <form id="bucket-form"><div class="dialog-title"><h2 id="bucket-dialog-title">Create bucket</h2>
+      <button class="icon-button close" type="button" aria-label="Close">×</button></div>
+      <label for="bucket-name">Bucket name</label><input id="bucket-name" required minlength="3" maxlength="63" autocapitalize="none" spellcheck="false">
+      <p class="hint">Use 3–63 lowercase letters, numbers, dots, or hyphens.</p>
+      <p class="error" id="bucket-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button class="secondary close" type="button">Cancel</button><button class="primary" type="submit">Create bucket</button></div>
+    </form>
+  </dialog>
+  <dialog id="upload-dialog" aria-labelledby="upload-dialog-title">
+    <form id="upload-form"><div class="dialog-title"><h2 id="upload-dialog-title">Upload file</h2>
+      <button class="icon-button close" type="button" aria-label="Close">×</button></div>
+      <label for="file">File</label><input id="file" type="file" required>
+      <p class="hint">Up to 128 MiB per file.</p>
+      <label for="object-key">Object key</label><input id="object-key" required spellcheck="false" autocapitalize="none">
+      <p class="hint">Include a folder prefix if needed, such as reports/sales.csv.</p>
+      <label class="check"><input type="checkbox" id="replace">Replace an existing object with this key</label>
+      <p class="error" id="upload-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button class="secondary close" type="button">Cancel</button><button class="primary" type="submit">Upload</button></div>
+    </form>
+  </dialog>
+  <div id="notice" class="notice" role="status" hidden></div>
+</body>
+</html>

@@ -33,6 +33,25 @@ services:
       retries: 25
     restart: unless-stopped
 
+  web:
+    profiles: ["web"]
+    build: ./apps/web
+    environment:
+      S3_ENDPOINT: http://datavault:${DATAVAULT_S3_PORT:-9000}
+      ADMIN_ENDPOINT: http://datavault:${DATAVAULT_ADMIN_PORT:-9001}
+      AWS_DEFAULT_REGION: ${DATAVAULT_REGION:-us-east-1}
+      AWS_EC2_METADATA_DISABLED: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      datavault: {condition: service_healthy}
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8080/', timeout=3).close()"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+
   cli:
     profiles: ["tools"]
     build: {context: ., dockerfile: deployments/docker/Dockerfile, target: cli}

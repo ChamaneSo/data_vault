@@ -1,19 +1,19 @@
 # DataVault 0.1.0 implementation status
 
-The source, migrations, Compose projects, CI workflow and test fixtures are present. Docker execution belongs to the operator. This reconstruction has not yet produced a running image or a release-qualified binary.
+The operator's Docker run reached a healthy server. Eight integration tests passed and one failed: multipart completion returned `EntityTooSmall` for a reversed part list. The handler now checks the non-final size limit after validating the manifest. The revised server and integration test await a rerun.
 
 | Milestone | Status | Evidence and outstanding acceptance check |
 | --- | --- | --- |
-| 1. Foundation | IN PROGRESS | Workspace, configuration, JSON logging, health probes, migrations and Compose are present. Credential generation and preservation passed a shell regression test. The first container bootstrap must generate the dependency lockfile. Compose startup awaits execution. |
+| 1. Foundation | TESTED | Compose reported a healthy server and the integration suite performed real PostgreSQL-backed operations. |
 | 2. Storage | IMPLEMENTED | UUID blobs, bounded input/output, checksum checks, file and directory sync, single-writer lock, volume identity, startup checks and offline archival. Rust tests cover ranges, interruption, subprocess termination during a write, missing files, tampering, and symlink rejection. Execution pending. |
 | 3. Metadata | IMPLEMENTED | PostgreSQL schema, transactional publication, scoped advisory locks, row-level permission checks and indexed C-collated keyset listing. A SQL regression fixture runs both migrations in an isolated transaction. Execution pending. |
-| 4. Core S3 | IMPLEMENTED | Bucket and object CRUD, HEAD, prefix/delimiter listing, metadata and byte-range GET. Wire tests await the first image build. |
-| 5. Authentication and authorization | IMPLEMENTED | SigV4, scoped roles, key issuance and revocation, account disabling, AES-GCM secrets and TLS configuration. Live authorization and denial tests pending. |
+| 4. Core S3 | TESTED | The core object, listing, and AWS CLI wire tests passed in the reported run. |
+| 5. Authentication and authorization | IMPLEMENTED | Live signing, scoped permissions and denial cases passed in the reported run. TLS deployment validation is outstanding. |
 | 6. Administration and CLI | IMPLEMENTED | Versioned JSON routes, one-time secret issuance, Clap commands and OpenAPI. Static checks matched all 11 documented paths to the router. Container CLI calls pending. |
-| 7. Expanded compatibility | IN PROGRESS | Five multipart operations, copy, presigned URLs and ETag conditions are present. Interoperability tests remain unexecuted. Date conditions and full checksum negotiation are outside current coverage. |
-| 8. Hardening and validation | IN PROGRESS | CI, observability, isolated fault fixtures, AWS CLI restart demonstration, benchmark and six decision records are present. Compilation, linting, dependency audit, failure injection and end-to-end tests await container execution. |
+| 7. Expanded compatibility | IN PROGRESS | Copy and presigned URL cases passed. Multipart order validation has been corrected in source. Successful completion, retry and abort await the rerun. |
+| 8. Hardening and validation | IN PROGRESS | Eight integration cases passed before the multipart fix. Fault injection, audit, CI and restart results are outstanding. |
 
-**IMPLEMENTED** means the code exists. **TESTED** requires executing the relevant acceptance test. No full milestone has been marked TESTED.
+**IMPLEMENTED** means the code exists. **TESTED** means a relevant acceptance test passed.
 
 ## Checks executed during reconstruction
 
@@ -44,6 +44,6 @@ The [quick start](../README.md) includes the two-phase AWS CLI demonstration. Th
 
 ## Release gaps
 
-The Cargo build, formatting gate, unit tests, SQL migrations, container health checks, PostgreSQL transactions, AWS compatibility tests, CI and restart demonstration still require execution. No runtime pass/fail count or performance measurement is available. The subprocess storage test and deferred-commit fixture cover specific failure points. A full-server kill during an HTTP transfer and a live database disconnect remain separate operational acceptance checks.
+Rebuild the server and rerun the integration suite to verify the multipart fix. Results for formatting, unit tests, dedicated PostgreSQL and fault suites, CI, restart and performance measurements have not been reported. A full-server kill during an HTTP transfer and a live database disconnect remain separate operational acceptance checks.
 
 Offline recovery preserves unused bytes under a recovery directory. Operators control archive retention and can abort individual multipart uploads. There is no automatic expiration of multipart sessions. Disk use can exceed reported logical bytes. Multi-node replication, failover, object history, and a tamper-evident audit trail are outside this version.

@@ -36,6 +36,10 @@ jobs:
         run: docker compose run --rm postgres-tests
       - name: Real S3 and administrative API tests
         run: docker compose run --rm integration-tests
+      - name: Web browser service integration
+        run: |
+          docker compose up -d --build --wait web
+          docker compose run --rm integration-tests pytest -q web_cases.py
       - name: Isolated capacity and commit-failure tests
         run: docker compose -f compose.recovery.yml run --rm --build fault-tests
       - name: Write demo object

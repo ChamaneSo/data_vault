@@ -15,6 +15,18 @@ docker compose run --rm --build cli server status
 
 The bootstrap container creates a private development `.env` and resolves `Cargo.lock` on its first run. Later runs preserve both files. Keep the generated lockfile in version control. The server opens the catalog, applies embedded SQLx migrations, checks the data volume, and starts listening. S3 is at `http://localhost:9000`. Administration is at `http://localhost:9001/api/v1`. Both host ports bind to loopback.
 
+## Open the web app
+
+Start the optional object browser from the project root.
+
+```sh
+docker compose up -d --build --wait web
+```
+
+Open [localhost:8080](http://localhost:8080) and enter your service account's access key ID and secret access key. Select a bucket to browse folders, search by key prefix, upload or download files. Accounts with bucket-creation permission can use the **+** beside **Buckets**. The file picker accepts up to 128 MiB per upload and asks before replacing an existing key.
+
+The web service binds to loopback, signs S3 requests on the server, and checks readiness on the admin listener. It holds a one-hour session in container memory. Disconnecting or restarting the web container ends the session. To test the web app against the running platform, run `docker compose run --rm --build integration-tests pytest -q web_cases.py`.
+
 ## Create an application identity
 
 ```sh
@@ -91,7 +103,7 @@ The named volumes `datavault-data` and `postgres-data` survive a normal shutdown
 
 ## Implementation and limits
 
-The server contains S3 bucket and object handlers, ListObjectsV2 pagination and delimiter grouping, ETag conditions, range GET, multipart sessions, CopyObject, and SigV4 verification. Administration includes account and key lifecycle, bucket grants, health checks, and Prometheus metrics. The source and container test suite have been reconstructed. Docker compilation, interoperability checks and restart validation await execution. This release has no replication, failover, version history, or capacity guarantee. Startup reports unused files for recovery review. Repeated overwrites can increase disk consumption.
+The server contains S3 bucket and object handlers, ListObjectsV2 pagination and delimiter grouping, ETag conditions, range GET, multipart sessions, CopyObject, and SigV4 verification. Administration includes account and key lifecycle, bucket grants, health checks, and Prometheus metrics. See the implementation checklist below for current test results. This release has no replication, failover, version history, or capacity guarantee. Startup reports unused files for recovery review. Repeated overwrites can increase disk consumption.
 
 - [Architecture and persistence](docs/architecture.md)
 - [S3 compatibility and administration](docs/api.md)
