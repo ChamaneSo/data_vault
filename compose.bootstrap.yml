@@ -1,0 +1,10 @@
+services:
+  initialize:
+    image: rust:1.100-bookworm
+    working_dir: /project
+    volumes:
+      - .:/project
+      - cargo-bootstrap:/usr/local/cargo/registry
+    command: ["bash", "scripts/dev-init.sh"]
+volumes:
+  cargo-bootstrap:

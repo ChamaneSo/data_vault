@@ -1,0 +1,62 @@
+# Dedicated fault-test stack. No host ports, production mounts, or Docker socket.
+name: datavault-recovery
+services:
+  fault-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: datavault_recovery
+      POSTGRES_USER: recovery
+      POSTGRES_PASSWORD: ${DATAVAULT_DATABASE_PASSWORD:?Bootstrap development credentials first}
+    tmpfs: ["/var/lib/postgresql/data:size=256m,mode=0700"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "recovery", "-d", "datavault_recovery"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  fault-server:
+    build: {context: ., dockerfile: deployments/docker/Dockerfile, target: runtime}
+    env_file: .env
+    environment:
+      DATAVAULT_ENV: development
+      DATAVAULT_STORAGE_PATH: /scratch
+      DATAVAULT_DATABASE_HOST: fault-db
+      DATAVAULT_DATABASE_NAME: datavault_recovery
+      DATAVAULT_DATABASE_USER: recovery
+      DATAVAULT_DATABASE_PORT: 5432
+      DATAVAULT_S3_HOST: 0.0.0.0
+      DATAVAULT_S3_PORT: 9000
+      DATAVAULT_ADMIN_HOST: 0.0.0.0
+      DATAVAULT_ADMIN_PORT: 9001
+    depends_on:
+      fault-db: {condition: service_healthy}
+    tmpfs: ["/scratch:size=16m,mode=0700,uid=10001,gid=10001"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9001/health/ready"]
+      interval: 2s
+      timeout: 4s
+      retries: 30
+
+  fault-inject:
+    image: postgres:17-bookworm
+    depends_on:
+      fault-server: {condition: service_healthy}
+    environment:
+      PGHOST: fault-db
+      PGDATABASE: datavault_recovery
+      PGUSER: recovery
+      PGPASSWORD: ${DATAVAULT_DATABASE_PASSWORD}
+    volumes: ["./tests/faults.sql:/faults.sql:ro"]
+    command: ["psql", "-X", "-v", "ON_ERROR_STOP=1", "-f", "/faults.sql"]
+
+  fault-tests:
+    build: {context: ., dockerfile: tests/Dockerfile}
+    depends_on:
+      fault-inject: {condition: service_completed_successfully}
+    environment:
+      DATAVAULT_ADMIN_TOKEN: ${DATAVAULT_ADMIN_TOKEN}
+      ADMIN_ENDPOINT: http://fault-server:9001
+      S3_ENDPOINT: http://fault-server:9000
+      AWS_DEFAULT_REGION: ${DATAVAULT_REGION:-us-east-1}
+      AWS_EC2_METADATA_DISABLED: "true"
+    command: ["pytest", "-q", "-p", "no:cacheprovider", "recovery_cases.py"]

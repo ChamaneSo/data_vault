@@ -1,0 +1,107 @@
+name: datavault
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${DATAVAULT_DATABASE_NAME:-datavault}
+      POSTGRES_USER: ${DATAVAULT_DATABASE_USER:-datavault}
+      POSTGRES_PASSWORD: ${DATAVAULT_DATABASE_PASSWORD:?Run the bootstrap container first}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 4s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  datavault:
+    build: {context: ., dockerfile: deployments/docker/Dockerfile, target: runtime}
+    env_file: .env
+    depends_on:
+      postgres: {condition: service_healthy}
+    ports:
+      - "127.0.0.1:${DATAVAULT_S3_PORT:-9000}:${DATAVAULT_S3_PORT:-9000}"
+      - "127.0.0.1:${DATAVAULT_ADMIN_PORT:-9001}:${DATAVAULT_ADMIN_PORT:-9001}"
+    volumes:
+      - datavault-data:/var/lib/datavault
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:$$DATAVAULT_ADMIN_PORT/health/ready"]
+      interval: 5s
+      timeout: 4s
+      retries: 25
+    restart: unless-stopped
+
+  cli:
+    profiles: ["tools"]
+    build: {context: ., dockerfile: deployments/docker/Dockerfile, target: cli}
+    environment:
+      DATAVAULT_ADMIN_TOKEN: ${DATAVAULT_ADMIN_TOKEN}
+      DATAVAULT_ADMIN_ENDPOINT: http://datavault:${DATAVAULT_ADMIN_PORT:-9001}
+      DATAVAULT_S3_ENDPOINT: http://datavault:${DATAVAULT_S3_PORT:-9000}
+      AWS_DEFAULT_REGION: ${DATAVAULT_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID:
+      AWS_SECRET_ACCESS_KEY:
+    volumes:
+      - .:/work
+    working_dir: /work
+    depends_on:
+      datavault: {condition: service_healthy}
+
+  rust:
+    profiles: ["tools"]
+    build: {context: ., dockerfile: deployments/docker/Dockerfile, target: tools}
+    working_dir: /src
+    volumes:
+      - .:/src
+      - cargo-registry:/usr/local/cargo/registry
+      - rust-build:/build
+    command: ["cargo","test","--locked","--workspace"]
+
+  audit:
+    profiles: ["tools"]
+    build: {context: ., dockerfile: deployments/docker/Dockerfile, target: audit}
+    volumes: [".:/src:ro"]
+
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v3.5.0
+    volumes: ["./deployments/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["127.0.0.1:9090:9090"]
+
+  integration-tests:
+    profiles: ["test"]
+    build: {context: ., dockerfile: tests/Dockerfile}
+    environment:
+      DATAVAULT_ADMIN_TOKEN: ${DATAVAULT_ADMIN_TOKEN}
+      ADMIN_ENDPOINT: http://datavault:${DATAVAULT_ADMIN_PORT:-9001}
+      S3_ENDPOINT: http://datavault:${DATAVAULT_S3_PORT:-9000}
+      AWS_DEFAULT_REGION: ${DATAVAULT_REGION:-us-east-1}
+      AWS_EC2_METADATA_DISABLED: "true"
+    depends_on:
+      datavault: {condition: service_healthy}
+    volumes:
+      - demo-state:/state
+
+  postgres-tests:
+    profiles: ["test"]
+    image: postgres:17-bookworm
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      PGHOST: postgres
+      PGUSER: ${DATAVAULT_DATABASE_USER:-datavault}
+      PGDATABASE: ${DATAVAULT_DATABASE_NAME:-datavault}
+      PGPASSWORD: ${DATAVAULT_DATABASE_PASSWORD}
+    volumes:
+      - ./tests/postgres.sql:/project/tests/postgres.sql:ro
+      - ./apps/server/migrations:/project/apps/server/migrations:ro
+    command: ["psql", "-X", "-f", "/project/tests/postgres.sql"]
+
+volumes:
+  postgres-data:
+  datavault-data:
+  cargo-registry:
+  rust-build:
+  demo-state:

@@ -1,0 +1,47 @@
+name: DataVault
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  formatting:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Prepare container workspace
+        run: docker compose -f compose.bootstrap.yml run --rm initialize
+      - name: Check Rust formatting
+        run: docker compose run --rm --build rust cargo fmt --all --check
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Generate isolated credentials and resolve dependencies
+        run: docker compose -f compose.bootstrap.yml run --rm initialize
+      - name: Bootstrap regression
+        run: docker compose -f compose.bootstrap.yml run --rm initialize bash tests/test_bootstrap.sh
+      - name: Lint
+        run: docker compose run --rm --build rust cargo clippy --locked --workspace --all-features --all-targets
+      - name: Unit and filesystem tests
+        run: docker compose run --rm rust cargo test --locked --workspace
+      - name: Check dependencies against RustSec
+        run: docker compose run --rm --build audit
+      - name: Build server and CLI images
+        run: docker compose build datavault cli integration-tests
+      - name: Start and check readiness
+        run: docker compose up -d --wait
+      - name: Management CLI
+        run: docker compose run --rm cli server status
+      - name: PostgreSQL transactions and migrations
+        run: docker compose run --rm postgres-tests
+      - name: Real S3 and administrative API tests
+        run: docker compose run --rm integration-tests
+      - name: Isolated capacity and commit-failure tests
+        run: docker compose -f compose.recovery.yml run --rm --build fault-tests
+      - name: Write demo object
+        run: docker compose run --rm integration-tests python demo.py write
+      - name: Recreate containers and verify persistence
+        run: |
+          docker compose down
+          docker compose up -d --wait
+          docker compose run --rm integration-tests python demo.py verify
